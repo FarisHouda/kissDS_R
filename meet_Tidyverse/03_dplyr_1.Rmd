@@ -1,0 +1,227 @@
+---
+title: "dplyr Introduction"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_tidyverse, message=TRUE, include=FALSE}
+# Installer le package s'il n'est pas présent 
+if(!require(tidyverse)){
+  install.packages(tidyverse)
+}
+# Charger le package dans l'environnement
+library(tidyverse)
+```
+
+
+## Tibble
+Avant de nous attacker à `dplyr` nous allons d'abord nous interesser au package `tibble`. C'est un package qui isole la definition de la classe de tableau utilisée dans le `tidyverse` et faisait partie du package `dplyr`avant d'en être extrait pour améliorer la lisibilité du `tidyverse`.
+
+`tibble` est une extension de la classe `data.frame` qui vise à ajuster certaines fonctionalités par default afin de les rendre plus adaptée à la fonçon dont on utilise les data frame. En effet, certains choix de fonctionalités de la classe `data.frame` ne sont tout simplement pas pratiques:
+
+- `tibble` ne change pas le type des données à la création, comparé à `data.frame` qui transforme par defaut les types `character` en `factor`  
+- Une impression partielle des données du tibble (les 10 premières lignes) lors d'un `print` comparé à `data.frame` qui imprime tout
+- `tibble` utilise les noms de variables de façon stricte avec l'opérateur `$` et ne fait pas de matching partiel des noms de variables.
+- `tibble` un comportement fixe pour les opérateurs de selection `[` et `[[` qui retournent systématiquement un `tibble` pour le premier et un vecteur pour le second. Dans `data.frame` le type du resultat de ces opérateurs est variable.
+
+Il est possible de passer d'une classe à l'autre en utilisant les fonction `as_tibble()` et `as.data.frame()`.
+
+
+## Dplyr Introduction
+
+`dplyr` est un package dédié à la manipulation des tableaux (des tibbles pour être précis). 
+Vous pouvez vous réfferer à cette [fiche sythétique](https://www.rstudio.com/wp-content/uploads/2015/02/data-wrangling-cheatsheet.pdf) (en anglais) pour un résumé des fonctionalité et la syntaxe du package. Nous allons dans la suite introduire ces fonctionalités une à une.
+
+`dplyr` donne accès à une collection de verbes pour manipuler les données tabulaires:
+
+- Ordonner les observations: ` arrange() `
+- Selectionner des oservations: ` filter() `
+- Selectionner des variables: ` select() `
+- Créer de nouvelles variables: ` mutate() `
+- Créer des groupes d'observations: ` group_by() `
+- Calculer des résumés statistiques par variable: ` summarize() `
+- Combiner plusieurs tables: ` Join() `
+
+on va utliser un jeu de données sur les ventes de jeux videos pour explorer dplyr. Le jeu de données est disponible sur [Kaggle](https://www.kaggle.com/rush4ratio/video-game-sales-with-ratings).
+
+```{r read_sales_vg}
+# specify colonnes types:
+colonnes_types <- cols(
+  Name = col_character(),
+  Platform = col_character(),
+  Year_of_Release = col_integer(),
+  Genre = col_character(),
+  Publisher = col_character(),
+  NA_Sales = col_double(),
+  EU_Sales = col_double(),
+  JP_Sales = col_double(),
+  Other_Sales = col_double(),
+  Global_Sales = col_double(),
+  Critic_Score = col_integer(),
+  Critic_Count = col_integer(),
+  User_Score = col_double(),
+  User_Count = col_integer(),
+  Developer = col_character(),
+  Rating = col_character() )
+
+# read data with specified colonnes types
+vg_sales <- read_csv("./data/Video_Games_Sales_as_at_22_Dec_2016.csv", 
+                     col_type = colonnes_types)
+# show data
+vg_sales
+```
+
+
+### arrange & filter:
+Les fonctions `arrange()` et `filter()` opèrent sur les lignes d'un tibble pour ordonner ou selectionner les rangées.
+
+On va utiliser la fonction `arrange()` pour classer les observations autrement. 
+par année (du plus récent au plus vieux) puis par platefrome puis par genre puis par nom:
+
+```{r vgsales_arrange_pl_ge_y}
+vg_sales %>%
+  arrange(desc(Year_of_Release), Platform, Genre, Name)
+```
+
+la fonction `desc()` permet de specifier un ordre décroissant, alors que l'order par défault est croissant. 
+
+Pour selectionner des observations sur la base de conditions on utilise la fonction `filter` en specifiant des conditions à remplir. Seules les observations pour lesquelles les conditions donnent `TRUE` sont retenues.
+Nousallons nous interesser aux ventes du Genre Aventure de la plateform playstation (PS3 et PS4), entre les années 2005 et 2015, avec des ventes en region amerique du nord (NA_Sales) supérieures à 0.1 millions.
+
+```{r vgsales_filter_y_G_NA}
+vg_sales %>%
+  # select needed data
+  filter(Year_of_Release >= 2005, 
+         Year_of_Release <= 2015, 
+         Platform %in% c("PS3", "PS4"),
+         Genre == "Adventure",
+         NA_Sales >= 0.1) %>%
+  # arrange observations
+  arrange(desc(Year_of_Release), Platform, Genre, Name)
+```
+
+Pour formuler des conditions plus complexes on peut utiliser les operateur booleens `&` (et), `|` (ou), `!` (negation), `xor`, `any` et `all`.
+
+Il existe d'autre fonctions pour les opérations sur les observations que nous allons lister dans la suite:
+
+- `distinct()` enlève les observations dupliquées
+- `sample_frac()` selectionne une fraction du nombre d'observations au hasard, avec le ratio specifié. Par example `iris %>% sample_frac(0.1)` va selectionner au hazard 10 % des observations du jeux de données. L'option `replace` permet de choisir si l'echantillonage se fait par remplacement (`TRUE`) ou pas (`FALSE`). 
+- `sample_n()` Va selectionner au hazard le nombre specifié d'observations. Par example `iris %>% sample_n(10)` va selectionner au hazard 10 observations. L'option `replace` permet de choisir si l'echantillonage se fait par remplacement (`TRUE`) ou pas (`FALSE`). 
+- `slice()` permet de selectionner les observations dans la plage spéficiée. Par example `iris %>% slice(5:10)` retourne les observations 5 à 10 dans le jeux de données.
+- `top_n()` retourne toutes les observations correspondantes aux n valeurs les plus élevées de la colonne specifiée. Par example `iris %>% top_n(4, Petal.Width)`. Les 4 valeurs les plus élevées de Petal.Width sont `2.5, 2.5, 2.5, 2.4`, donc la fonction retourne toutes les observations correspondantes à 2.5 et 2.4 (donc 6 observations et non 4).
+
+### select & mutate:
+
+La fonction `select()`permet de selectionner les colonnes à garder dans le tableau de données. pour voir quelles sont les combinasons de plateformes et de genres présentes dans le jeux de données on va selectionner ces deux colonnes. onn en profite pour utiliser les fonctions `distinct()` et `arrange()` pour éliminer les doublons et classer les résultats:
+
+```{r vdsales_select}
+vg_sales %>%
+  select(Platform, Genre) %>%
+  distinct() %>%
+  arrange(Platform, Genre)
+```
+
+Les tableaux de données peuvent contenir un nombre important de colonnes. Les specifier une par une peut vite devenir une tâche pénible. On a à disposision un certain nombre de fonctions pour gérer cet aspect:
+
+- `contains()` permet de selectionner les colonnes dont le nom contient la chaîne de charactères spécifiée. Par example `iris %>% select(Species, contains("Sepal"))`
+- `starts_with()` permet de selectionner les colonnes dont le nom commence par la chaîne de charactères specifiée. Par example `iris %>% select(Species, starts_with("Sepal"))`
+- `ends_with()` permet de selectionner les colonnes dont le nom se termine par la chaîne de charactères specifiée. Par example `iris %>% select(Species, ends_with("Length"))`
+- `matches()` permet de donner une expression régulière pour identifier les colonnes à garder. Plus sur ce sujet dans le section relative au traitement des chaîne de charactères.
+- `num_range()` permet de selectionner les colonnes dont le nom est composé par un nom avec un suffixe numérique. Par example `num_range("var_", 1:3)` permet de selectionner les colonnes `var_1`, `var_2` et `var_3`.
+- `:` (`Debut:Fin`) permet de determiner une plage de colonnes en spécifiant les noms des première et dernière colonnes. Par example `iris %>% select(Sepal.Length:Petal.Width)`
+- `one_of()` permet de selectionner les colonnes spécifiée par le vecteur de noms donné. Par example `iris %>% select(one_of(c("Species", "Sepal.Width")))`
+- `everything()` selectionne toutes le colonnes.
+
+On a aussi besoin créer de nouvelles colonnes dans la table en utilisant les données existantes. Pour celà on peut utiliser la fonction `mutate()` ou `transmute()`.
+Le fonction `mutate()` crée la nouvelle variable tout en présérvant les variables initiales qui ont sérvit à la créer. 
+
+```{r vgsales_mutate}
+vg_sales %>%
+  select(Name, NA_Sales) %>%
+  mutate(NA_Sales_dlr = NA_Sales * 10**6)
+```
+
+La fonction mutate permet aussi de supprimer une variables en lui assignant la valeur `NULL`.
+```{r vgsales_mutate_null}
+vg_sales %>%
+  select(Name, NA_Sales) %>%
+  mutate(NA_Sales_dlr = NA_Sales * 10**6,
+         NA_Sales = NULL)
+```
+
+
+La fonction `transmute()` fait la même chose mais élimine les variables existantes.
+
+```{r vgsales_transmute}
+vg_sales %>%
+  select(Name, NA_Sales) %>%
+  transmute(NA_Sales_dlr = NA_Sales * 10**6)
+```
+
+On peut créer plusieurs variables dans la même instance de mutate, et aussi utiliser une variable qui vient d'être définie dans une formule après sa création, tout ça dans le même appel à mutate:
+
+```{r vgsales_mutate_many}
+vg_sales %>%
+  select(Name, NA_Sales, EU_Sales, Global_Sales) %>%
+  mutate(NA_Sales_ratio = NA_Sales / Global_Sales,
+         EU_Sales_ratio = EU_Sales / Global_Sales,
+         Wester_Sales_ratio = NA_Sales_ratio + EU_Sales_ratio,
+         NA_Sales = NULL,
+         EU_Sales = NULL)
+```
+
+On peut appliquer la même transformation à toute les colonnes en utilisant `mutate_each()`:
+
+```{r }
+vg_sales %>%
+  mutate_each(funs(dlr = . * 10**6), ends_with("Sales"))
+```
+
+### group_by & summarize:
+On a souvent besoins de calculer des résumés statistiques par type de observations. Par exemple, on peut vouloir obetenir les revenus moyen par genre de jeux, ou par type de plateforme. Pour calculer ce genre de résultats nous devons utiliser deux fonctions dans un pipe de ce type: `data %>% group_by() %>% summarise()`.
+
+La fonction `group_by()` permet de séparer un tableau en plusieurs tableau sur la base des informations des colonnes spécifiées. Par example si on fait un group by sur la base du genre de jeux, la fonction séparera le tableau en une list de tableaux chacun contenant les données correspondantes à un genre (`Action`, `Adventure`, `Fighting` ...):
+
+```{r vgsales_groupby_genre}
+vg_sales %>%
+  group_by(Genre)
+```
+
+Lr resultat est la même table avec l'information sur la séparation en groupes. Cette information est accéssible par la fonction `groups()`:
+```{r vgsales_groupby_genre_bis}
+vg_sales %>%
+  group_by(Genre) %>%
+  groups
+```
+
+Sur cette base on utilise la fonction `summarise()` pour calculer les statistique sur chaque groupe. D'abords explorons le résultat de l'application de `summarise()` sur le table d'origine:
+```{r vgsales_summarize}
+vg_sales %>%
+  summarise(avg_sales = mean(Global_Sales))
+```
+
+On ajouter l'étape `group_by()` on realise la moyenne des ventes par genre de jeux video:
+```{r vgsales_groupby_summarize}
+vg_sales %>%
+  group_by(Genre) %>%
+  summarise(avg_sales = mean(Global_Sales))
+```
+Les jeux de plateforme semblent avoir la moyenne des ventes la plus élevée (en pensant à Mario Bros, ça paraît plausible). Mais il serait interessant d'avoir le nombre de jeux dans chaque categorie et un peu plus d'informations sur les ventes comme la mediane, le min et le max des ventes. pour celà nous allons utiliser la fonction `n()` pour compter les observations par groupe, et les fonctions `median()`, `min()` `max()` pour les statitiques additionnelles:
+```{r vgsales_groupby_summarize_bis}
+vg_sales %>%
+  group_by(Genre) %>%
+  summarise(avg_sales = mean(Global_Sales),
+            med_sales = median(Global_Sales),
+            min_sales = min(Global_Sales),
+            max_sales = max(Global_Sales),
+            nb_games = n())
+```
+Si on veut former les groupes en utilisant plusieurs variables, il suffit de les spécifier dans l'appel de la fonction `group_by()`. Par example: ` vg_sales %>% group_by(Genre, Platform) %>% summarize(nb_games = n())` pour réaliser des groupes à la fois sur `Genre` et `Platform. De façon similaire à `mutate_each()`, nous avons la fonction `summarise_each()` pour réaliser le résumé statistique de plusieurs colonnes avec la même fonction.
+
+```{r dplyr_intro}
+
+```
+

@@ -1,0 +1,309 @@
+---
+title: "readr & readxl"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r load_tidyverse, message=TRUE, include=FALSE}
+# Installer le package s'il n'est pas présent 
+if(!require(tidyverse)){
+  install.packages(tidyverse)
+}
+# Charger le package dans l'environnement
+library(tidyverse)
+```
+
+
+## Intro:
+
+  Le pipe d'analyse de données commence souvent par une étape de lecture des données à partire d'un ou plusieurs (voir une collection nombreuse) de fichiers. Ces fichiers peuent être de plusieurs types dépendant des dommaines d'application et des sources de données utilisées. On peut en citer les fichiers texte du type `.csv`, `.txt` ou des fichiers Excel `.xls` ou `.xlsx`.
+
+
+## Readr:
+Le package `readr` permet les fichiers texte de plusieurs type. La différence entre ces types est le charactère utiliser les différentes valeurs sur une même ligne:
+
+- `.csv` utilise `,` ou `;` comme séparateur
+- `.tsv` utilise des tabulations commes séparateur
+- Pour les fichiers `.txt` il faut vérifier au prélable le charactère de séparation. (Certaines fonctions de lecture comme `fread` du package `data.table` détecte automatiquement le charactère séparateur)
+
+`reader` propose une fonction de lecture pour chaque type de fichier:
+
+- `read_csv()` pour lire les fichiers `.csv` avec un séparateur `,` (csv: comma separated values - "valeurs séparées par une virgule" en français).
+- `read_csv2()` pour lire les fichiers `.csv` avec un séparateur `;` (ce type de csv est notement utilisé par Microsoft Excel par défault).
+- `read_tsv()` pour lire les fichiers texte avec des tabulations comme séparateurs (tsv: tabulation separated values - "valeurs séparées par des tabulations" en français).
+- `read_delim()`pour lire les fichiers texte avec un séparateurs specifique (comme un `|`). Le charactère de séparation doit être donné comme deuxième argument de la `read_delim()`. 
+- `read_log()` pour lire des fichier log Apache (des fichiers de serveurs internet). Voir aussi le package `webreadr` pour plus de fonctionalités pour ce type de fichiers.
+- `read_fwf()` pour lire des fichiers de largeur constante (fwf: fixed width files - "fichier à largeur fixe" en français). Il est nécessaire de donner le nombre de charactères dédiés à chanque variable (en spécifiant l'option `fwf_widths()`) ou la position du premier character de chanque variable (en spécifiant l'option `fwf_positions()`)
+
+Nous allons dans la suite nous focaliser sur les fichiers `.csv` sachant que les fonctionalités des autres fonctions sont similaires.
+
+La fonction `read_csv()` prend comme argument le chemin vers le fichier csv. Il est recommender d'uiliser un chemin relatif qui commence par un `.` comme `./le/chemin`. Le `.` repesente le chemin vers le dossier d'éxecusion de R qu'on peut trouver en utilisant le fonction `getwd()`
+On composer le chemin en ajoutant après le `.` le chemin vers le fichier `.csv` en partant du dossier d'execution. 
+
+Dans l'example si dessous le fichier `utilisateur.csv` est dans le dossier `data` qui est contenu dans le dossier principale du projet. Donc le chemin vers ce fichier est `./data/utilisateur.csv`
+```{r readr_utilisateur}
+read_csv("./data/utilisateur.csv")
+```
+
+`read_csv()` identifie automatiquement le type de chaque colonne en itilisant les 1000 premières lignes. Le résultat de cette inférence est donnée en sortie de la fonction dans la partie `cols(...)`. On voit dans ce cas que l'inférence du nom, prénom est de type charactère (`col_character()`). Celle de l'age est de type entier (`col_integer()`). L'inférence de la date d'enregistrement sera soit une date (si le format correspond au format par défaut du système) soit un charactère sinon. (la gestion des dates est un sujet délicat, on explorera ce sujet plus en détail avec le package `lubridate) 
+
+On peut fournir le type de chaque colonne dans la commande de lecture à travers l'option `col_types()`. On en profite pour forcer le 4eme champ à être une date. Cette option est très importante pour s'assurer de la reproductibilité des sorties en cas de changement de fichiers. 
+
+```{r readr_utilisateur_types}
+read_csv("./data/utilisateur.csv", 
+         col_types = list(
+           col_character(),
+           col_character(),
+           col_integer(),
+           col_date(format = "%d-%m-%Y")
+         ))
+```
+
+Le format de la date est construit sur la base des blocks suivant: `%d` jour, `%m` mois en chiffres, `%Y` les années en 4 chiffres
+
+Pour poursuivre nos testes on va donner à la fonction `read_csv()` une chaîne de charactères aui represente notre fichier d'entrée:
+
+```{r readr_util_direct_0}
+read_csv(
+  "Nom, Prenom, Age, Enregistre_le
+Marie, Dupond, 38, 18-03-2017
+Amira, Kharoub, 29, 05-02-2017"
+)
+```
+
+Si les données d'entrée contiennent des lignes de additionnelles avant le tableau, on utilise l'option skip pour specifier le nombre de lignes à sauter avant de commencer la lecture:
+
+```{r readr_util_direct_1}
+read_csv(
+  "Ce fichier est super important
+le tableau est juste après
+
+Nom, Prenom, Age, Enregistre_le
+Marie, Dupond, 38, 18-03-2017
+Amira, Kharoub, 29, 05-02-2017",
+skip = 3
+)
+```
+
+Le fichier peut contenir des lignes de commentaires précédées par un character distinctif (# par example). En specifiant l'option `comment` la fonction peut prendre en compte cette information et évite de lire ces lignes.
+
+```{r readr_util_direct_2}
+read_csv(
+  "# Ceci est un commentaire!!
+Nom, Prenom, Age, Enregistre_le
+Marie, Dupond, 38, 18-03-2017
+# un autre commentaire à propos de cet utilisateur
+Amira, Kharoub, 29, 05-02-2017",
+comment="#"
+)
+```
+
+`read_csv()` suppose que la première ligne lue contient les labels des colonnes. So cette information n'est pas dans le fichier, on peut dire à la fonction de lire directement les données en ajustant l'option `col_names`:
+
+```{r readr_util_direct_3}
+read_csv(
+  "Marie, Dupond, 38, 18-03-2017
+Amira, Kharoub, 29, 05-02-2017",
+col_names = FALSE
+)
+```
+ Cette option permet aussi de spécifier des noms à utiliser pour les colonnes, et qui marche en présence et en abscence de noms de colonnes dans le fichier:
+ 
+cas sans labels:
+```{r readr_util_direct_4}
+read_csv(
+  "Marie, Dupond, 38, 18-03-2017, 
+Amira, Kharoub, 29, 05-02-2017",
+col_names = c("name", "surname", "age", "subscription_date")
+)
+```
+
+cas avec labels:
+```{r readr_util_direct_5}
+read_csv(
+  "Nom, Prenom, Age, Enregistre_le
+Marie, Dupond, 38, 18-03-2017
+Amira, Kharoub, 29, 05-02-2017",
+col_names = c("name", "surname", "age", "subscription_date")
+)
+```
+
+Le package `readr` contient aussi des fonctions d'écriture des données de R vers des fichiers plats. Pour écrire des csv on utilise la fonction `write_csv(x, path)` qui prend comme paramètres obligatoires le nom du tableau à écrire (x) et le chemin vers le fichier où écrire la donnée (path). On liste les fonctions d'écriture ci-dessous:
+
+- `write_csv()` pour écrire un tableau dans un fichier csv
+- `write_excel_csv()` pour écrire un tableau dans un fichier csv selon le formatage excel (séparateur `;`).
+- `write_tsv()` pour écrire un tableau dans un fichier tsv (tabulations comme séparateur)
+- `write_delim()` pour écrire un tableau dans un fichier texte avec un séparateur spécifié avec l'option `delim`. Le séparateur par défault est un espace.
+
+
+## readxl
+
+Le package `readxl` contient la fonction `read_excel` pour lire les données de fichiers de type `.xls` ou `.xlsx`. Cette fonction à l'avantage de donner des fichiers dans le format des tableaux du tidyverse directement (que nous allons explorer dans les sections suivante). Pour des indications sur d'autre packages avec des fonctionalités similaires, voir la fin de cette section.
+
+Les options de la fonction sont similaires à la fonction `read_csv()`:
+
+- `sheet` permet de specifier la feuille de calcule à lire dans le fichier excel, soit par numéro ou par nom. La valaur par default est la première feuille.
+- `skip` specifie le nombre de ligne à sauter avant de commencer la lecture du fichier
+- `col_names` is `TRUE` permet de lire les labels des colonnes de la première ligne du fichier. Specifier comme `FALSE` pour specifier des noms pas défault (X1, X2, ... etc )
+- `col_type` si speciié comme `NULL`la fonction infère les types de colonnes. Sinon, il faut lui donners un vecteur des types au nombre des colonnes du fichier excel composé de `"blanck", "numeric", "date" ou "text"`
+ 
+Avant d'utiliser la fonction il est nécessaire de charger le package `readxl` car il n'est pas chargé automatiquement avec le tidyverse.
+
+ Example d'utilisation:
+```{r readxl_intro}
+library(readxl)
+read_excel("./data/utilisateur.xlsx")
+```
+
+Pour plus de fonctionalité avec des fichiers excel (pour l'écriture par example) voir les packages [`openxlsx`](https://github.com/awalker89/openxlsx),  [`xlsx`](https://cran.r-project.org/web/packages/xlsx/index.html) (utilise java), [XLConnect](https://cran.r-project.org/web/packages/XLConnect/) (utilise java).
+
+## Rio
+Sur ce même thème de l'acquisition de données vous pouvez explorez [le package `rio`](https://github.com/leeper/rio) qui propose une fonction `ìmport` pour lire toute une collection de types de fichiers différents ainsi qu'une fonction `export` pour l'écriture.
+
+## Tidyr:
+
+Une fois les données sont lues, elles doivent être transformées selon les critères du tidy data.
+
+- Une variable par colonne
+- Une observation par ligne
+- CHaque valeur doit avoir sa propre case
+
+La declinaison de cette definition sur des données réelles dépend à la fois des données et des questions auquelles on veut répondre. Pour introduire le concept de façon pratique et developper une intuition à ce sujet, on va traiter des cas de données non tidy et les transformations necessaires pour les rendre tidy.
+
+Le package `tidyr` introduit des fonctions de transformations pour passer des differents types de données non-tidy. On va utiliser ces fonctions pour traiter 5 examples representatifs de la manière dont les données peuvent être non-tidy. Plus d'informations à ce sujet sont disponibles en anglais dans la documentation du package (par example en tappant `vignette("tidy-data")` dans une console R.)
+
+"Toutes les familles heureuses se ressemblent. Chaque famille malheureuse, au contraire, l'est à sa façon."
+L. Tolstoï
+
+"Touts les jeux de données tidy de ressemblent. Chaque jeu de données non-tidy, au contraire, l'est à sa façon."
+H. Wickham
+
+Des manières dont les données peuvent être non-tidy on peut identifier:
+
+- De l'information dans les noms de colonnes
+- Plusieurs variables dans une même colonne
+- Des variables enregistrée à la fois dans les lignes et les colonnes
+- Plusieurs types de données dans la même table
+- Un type de données dans différentes tables
+
+Dans la suite on va utiliser `tidyr` pour traiter des examples des deux premiers points. Pour les trois suivants, nous aurons besoin d'utiliser le package `dplyr` pour les opérations sur les tableaux. 
+  
+### De l'information dans les noms de colonnes:
+
+Un formatage assez courant de données tabulaire consiste à utiliser un les valeurs d'une variable comme nom des colonnes contenant les données. Par example:
+
+```{r gather_01}
+sales_per_year <- read_csv("./data/sales_01.csv")
+sales_per_year
+```
+
+L'information de la variable utilisée comme noms de colonnes n'est donc pas dans sa propre colonne. En plus chaque ligne contient l'information de plusieurs observations. On utilse dans ce cas la fonction `gather` pour la transformer en format tidy.
+
+La fonction `gather` prend comme paramètres:
+
+- Le tableau de données
+- `key`: le nom à donner à la colonne qui va contenir l'information des noms des colonnes
+- `value`: le nom à donner à la colonne qui va contenir les valeurs des colonnes selectionnées
+- les colonnes à inclure (ou à exclure) dans la selection 
+
+On utilise `gather` pour créer une colonne specific pour les années, et une colonne pour les chiffres de ventes.
+
+```{r gather_02}
+sales_tidy <- sales_per_year %>%
+  gather(key = annee, value = ventes, `2014`, `2015`, `2016`, convert=TRUE)
+sales_tidy
+```
+
+A partir du tableau tidy on peut utiliser l'operation inverse à `gather` à travers la fonction `spread`. Cette fonction prend comme arguments:
+
+- Tableau de données
+- key: la colonnes à utiliser pour former les noms de colonnes à ajouter
+- value: la colonnes contenant les valeurs pour former les colonnes.
+
+On peut par example former un tableau avec les données de ventes partagées entre une colonnes `retail` et une colonne `online`:
+
+```{r spread_01}
+sales_tidy %>%
+  spread(Canal, ventes)
+```
+
+ou par pays:
+```{r spread_02}
+sales_tidy %>%
+  spread(Pays, ventes)
+```
+
+### Plusieurs variables dans une même colonne:
+
+Certaines colonnes peuvent contenir plusieurs informations combinées. L'information peut être combinée dans la colonnes de plusieurs façons:
+
+- Cas 1: Chaque case contient une information, mais la colonne contient des informations différentes. Une deuxième colonne contient l'information sur le type de données de la ligne.
+- Cas 2: Chaque case contient plusieurs informations combinées dans la même case.
+- Des combinaisons des deux cas!
+
+Prenons des exemples:
+
+#### Cas 1:
+
+```{r sales_volumes_01}
+sales_volumes <- read_csv("./data/sales_volumes.csv")
+sales_volumes
+```
+
+La colonne valeur contient deux types de données, les volumes de produits et les résultats de ventes.
+
+On peut utiliser la fonction `spread` pour créer deux colonnes: Une pour les ventes et une pour les volumes.
+
+```{r sales_volumes_01}
+sales_volumes %>%
+  spread(Type_info, valeur)
+```
+
+#### Cas 2:
+
+```{r sales_02}
+sales_per_semestre <- read_csv("./data/sales_02.csv")
+sales_per_semestre
+```
+
+on utilise la fonction gather pour combiner les données de ventes en une colonne:
+```{r sales_02_tidy}
+sales_per_semestre_tidy <- sales_per_semestre %>%
+  gather(key = "semestre", value = "ventes", S2.2015, S1.2016, S2.2016)
+sales_per_semestre_tidy
+```
+La colonne `semestre` contient l'information sur le semestre et sur l'année. On peut utiliser la fonction `separate()` pour former deux colonnes avec ces deux informations et l'ajouter au pipe danalyse au dessus:
+
+```{r sales_2_separate}
+sales_per_semestre_tidy <- sales_per_semestre %>%
+  gather(key = "semestre", value = "ventes", S2.2015, S1.2016, S2.2016) %>%
+  separate(semestre, c("semestre", "annee"))
+sales_per_semestre_tidy
+```
+
+La fonction `separate()` essaye d'identifier un charactère non-alphanumérique (qui ne sont ni un chiffre ni une lettre) pour séparer la donnée d'une case. Dans l'example précédent la fonction identifie le `.` comme charactère de separation. On peut spécifier le charactère de séparation à travers l'option `sep`. L'exemple précédent devient:
+
+```{r sales_2_separate_sep}
+sales_per_semestre_tidy_1 <- sales_per_semestre %>%
+  gather(key = "semestre", value = "ventes", S2.2015, S1.2016, S2.2016) %>%
+  separate(semestre, c("semestre", "annee"), sep="\\.")
+sales_per_semestre_tidy_1
+```
+
+On besoin d'utiliser "\\" pour specifier le charactère point car l'option `sep` prend comme entrée une expression régulière. Nous étudierons se sujet dans la section dédiée au traitement de texte.
+
+Il est possible d'effecture l'opération inverse avec la fonction `unite()`. Cette fonction prend comme entrée un tableau de données, le nom de la nouvelle colonne, les noms des colonnes à combiner, et un separateur specifié par l'option `sep`. 
+On va ajouter une étape pour créer une colonne qui combine l'information canal, année, semestre, séparé par un "_":
+
+
+```{r sales_2_separate_unite}
+sales_per_semestre %>%
+  gather(key = "semestre", value = "ventes", S2.2015, S1.2016, S2.2016) %>%
+  separate(semestre, c("semestre", "annee")) %>%
+  unite(tag, Canal, annee, semestre, sep="_")
+```
+
+Pour les cas plus complexes il faut combiner ces différentes fonctions pour créer un pipe d'analyse adapté. Nous allons revenir aux tronsformations tidy après avoir fait connaissance avec `dplyr` juste après!
