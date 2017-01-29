@@ -1,0 +1,19 @@
+Index:
+
+[Introduction au Tidyverse](01_tidyverse.Rmd)
+
+[Lire les données avec ](02_readr_readxl.Rmd)
+
+[Introduction à Dplyr](03_dplyr_1.Rmd)
+
+[Les liens avec SQL](04_sql.Rmd)
+
+[Transformer les tables avec Dplyr](05_dplyr_2.Rmd)
+
+[Maîtriser les factors avec Forcats](06_forecats.Rmd)
+
+[Gérer les dates avec Lubridate](07_libridate.Rmd)
+
+[Transformer les chaînes de charactère avec Stringr](08_stringr.Rmd)
+
+[Représenter les données avec qplot et ggplot](09_qplot_ggplot.Rmd)
