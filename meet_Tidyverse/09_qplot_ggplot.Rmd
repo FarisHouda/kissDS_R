@@ -1,6 +1,6 @@
 ---
 title: "plot from ggplot2"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}

@@ -1,6 +1,6 @@
 ---
 title: "readr & readxl"
-output: html_document
+output: github_document
 ---
 
 ```{r setup, include=FALSE}
@@ -257,7 +257,7 @@ La colonne valeur contient deux types de données, les volumes de produits et le
 
 On peut utiliser la fonction `spread` pour créer deux colonnes: Une pour les ventes et une pour les volumes.
 
-```{r sales_volumes_01}
+```{r sales_volumes_02}
 sales_volumes %>%
   spread(Type_info, valeur)
 ```
