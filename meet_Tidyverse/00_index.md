@@ -1,6 +1,6 @@
 Index:
 
-[Introduction au Tidyverse](01_tidyverse.md)
+[Introduction au Tidyverse](01_tidyverse.html)
 
 [Lire les données avec ](02_readr_readxl.md)
 
